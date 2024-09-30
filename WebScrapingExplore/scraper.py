@@ -101,7 +101,6 @@ def main():
     file_path = 'data/goodreads_reviews.csv'
     urls = pd.read_csv('data/book_links_all.csv')
     i = 0
-    num_books = len(urls['BookLinks'])
     urls['BookLinks'] = urls['BookLinks'] + '/reviews?reviewFilters={%22languageCode%22:%22en%22}'
     
     # Check if the file exists
@@ -113,7 +112,8 @@ def main():
 
     # Filter out URLs that are already in book_reviews
     filtered_urls = [url for url in urls['BookLinks'] if url not in existing_links]
-
+    num_books = len(filtered_urls)
+    
     # Proceed with the remaining URLs
     for url in filtered_urls:
          
