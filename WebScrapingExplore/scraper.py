@@ -83,11 +83,11 @@ def scrape_with_selenium(url, max_reviews=100):
             writer = csv.writer(file)
             # Write the header only if the file is being created
             if not file_exists:
-                writer.writerow(['Book Title', 'Review Text'])
+                writer.writerow(['Book Title', 'Link', 'Review Text'])
             # Write the reviews to the CSV file
             for review in reviews:
                 cleaned_review = re.sub(r'\s+', ' ', review).strip()
-                writer.writerow([book_title, cleaned_review])
+                writer.writerow([book_title, url, cleaned_review])
         print(f"Reviews saved to goodreads_reviews.csv. Total reviews: {min(len(reviews), max_reviews)}")
         
     except TimeoutException:
@@ -98,12 +98,27 @@ def scrape_with_selenium(url, max_reviews=100):
         driver.quit()
         
 def main():
+    file_path = 'data/goodreads_reviews.csv'
     urls = pd.read_csv('data/book_links_all.csv')
     i = 0
     num_books = len(urls['BookLinks'])
-    for url in urls['BookLinks']:
+    urls['BookLinks'] = urls['BookLinks'] + '/reviews?reviewFilters={%22languageCode%22:%22en%22}'
+    
+    # Check if the file exists
+    if os.path.isfile(file_path):
+        book_reviews = pd.read_csv(file_path)
+        existing_links = set(book_reviews['Link'].values)
+    else:
+        existing_links = set()
+
+    # Filter out URLs that are already in book_reviews
+    filtered_urls = [url for url in urls['BookLinks'] if url not in existing_links]
+
+    # Proceed with the remaining URLs
+    for url in filtered_urls:
+         
+        # Scrape the book
         i += 1
-        url += '/reviews?reviewFilters={%22languageCode%22:%22en%22}'
         scrape_with_selenium(url, max_reviews=120)  # Change max_reviews as needed
         print(f"Book {i}/{num_books} scraped")
 
