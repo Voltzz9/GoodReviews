@@ -10,6 +10,7 @@ import time
 import csv
 import re
 import os
+import pandas as pd
 
 def scrape_with_selenium(url, max_reviews=100):
     chrome_options = Options()
@@ -97,8 +98,13 @@ def scrape_with_selenium(url, max_reviews=100):
         driver.quit()
         
 def main():
-    url = "https://www.goodreads.com/book/show/11588/reviews?reviewFilters={%22languageCode%22:%22en%22}"
-    scrape_with_selenium(url, max_reviews=100)  # Change max_reviews as needed
+    urls = pd.read_csv('data/book_links_all.csv')
+    i = 0
+    num_books = len(urls['BookLinks'])
+    for url in urls['BookLinks']:
+        url += '/reviews?reviewFilters={%22languageCode%22:%22en%22}'
+        scrape_with_selenium(url, max_reviews=100)  # Change max_reviews as needed
+        print(f"Book {i+1}/{num_books} scraped")
 
 if __name__ == "__main__":
     main()
