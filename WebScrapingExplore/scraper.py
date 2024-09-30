@@ -77,9 +77,9 @@ def scrape_with_selenium(url, max_reviews=100):
         print(f"Number of reviews found: {len(reviews)}")  # Debug print
         
         # Check if the file exists
-        file_exists = os.path.isfile('goodreads_reviews.csv')
+        file_exists = os.path.isfile('data/goodreads_reviews.csv')
         # Open CSV file for writing (append mode if it exists, write mode if it doesn't)
-        with open('goodreads_reviews.csv', mode='a' if file_exists else 'w', newline='', encoding='utf-8') as file:
+        with open('data/goodreads_reviews.csv', mode='a' if file_exists else 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             # Write the header only if the file is being created
             if not file_exists:
@@ -102,9 +102,10 @@ def main():
     i = 0
     num_books = len(urls['BookLinks'])
     for url in urls['BookLinks']:
+        i += 1
         url += '/reviews?reviewFilters={%22languageCode%22:%22en%22}'
-        scrape_with_selenium(url, max_reviews=100)  # Change max_reviews as needed
-        print(f"Book {i+1}/{num_books} scraped")
+        scrape_with_selenium(url, max_reviews=120)  # Change max_reviews as needed
+        print(f"Book {i}/{num_books} scraped")
 
 if __name__ == "__main__":
     main()
