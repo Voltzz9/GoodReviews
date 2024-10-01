@@ -84,15 +84,36 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
 
                 # Find all review elements
                 review_elements = WebDriverWait(driver, 10).until(
-                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'section.ReviewText'))
+                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.ReviewCard__content'))
                 )
-
+                                
             for review_element in review_elements:
                 if len(reviews) >= reviews_to_scrape:
                     break
                 try:
                     review_text = review_element.find_element(By.CSS_SELECTOR, 'span.Formatted').text
-                    reviews.append(review_text)
+                    
+                    # Extract review stars
+                    review_stars = 0
+                    stars_elements = review_element.find_elements(By.CLASS_NAME, 'RatingStar__backgroundFill')
+                    review_stars = 5 - len(stars_elements)
+                    
+                    # Extract review date
+                    review_date_element = review_element.find_element(By.CSS_SELECTOR, '.Text__body3 a')
+                    review_date = review_date_element.text
+                    
+                    # Extract Number of likes
+                    try:
+                        review_likes_element = review_element.find_element(By.CSS_SELECTOR, '.Button__container:nth-child(1) .Button--subdued .Button__labelItem')
+                        review_likes = review_likes_element.text
+                        # Extract only the number from the string
+                        review_likes = int(review_likes.split(' ')[0])
+                    except NoSuchElementException:
+                        review_likes = 0
+                    
+                    reviews.append([review_text, review_date, review_stars, review_likes])
+                    
+                    
                 except NoSuchElementException:
                     print("Couldn't find review text for an element. Skipping.")
             print(f"Number of reviews scraped: {len(reviews)}")  # Debug print
@@ -102,18 +123,18 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
                 raise Exception("No reviews were scraped")
 
             # Check if the file exists
-            file_exists = os.path.isfile('data/goodreads_reviews.csv')
+            file_exists = os.path.isfile('data/goodreads_reviews_all.csv')
             # Open CSV file for writing (append mode if it exists, write mode if it doesn't)
-            with open('data/goodreads_reviews.csv', mode='a' if file_exists else 'w', newline='', encoding='utf-8') as file:
+            with open('data/goodreads_reviews_all.csv', mode='a' if file_exists else 'w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 # Write the header only if the file is being created
                 if not file_exists:
-                    writer.writerow(['Book Title', 'Link', 'Review Text'])
+                    writer.writerow(['Book Title', 'Link', 'Review Text', 'Review Date', 'Review Stars', 'Review Likes'])
                 # Write the reviews to the CSV file
                 for review in reviews:
-                    cleaned_review = re.sub(r'\s+', ' ', review).strip()
-                    writer.writerow([book_title, url, cleaned_review])
-            print(f"Reviews saved to goodreads_reviews.csv. Total reviews scraped: {len(reviews)}")
+                    cleaned_review = re.sub(r'\s+', ' ', review[0]).strip()
+                    writer.writerow([book_title, url, cleaned_review, review[1], review[2], review[3]])
+            print(f"Reviews saved to data/goodreads_reviews_all.csv. Total reviews scraped: {len(reviews)}")
             
             # If we've reached this point without exceptions, we can break the retry loop
             break
@@ -132,7 +153,7 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
     
         
 def main():
-    file_path = 'data/goodreads_reviews.csv'
+    file_path = 'data/goodreads_reviews_all.csv'
     urls = pd.read_csv('data/book_links_all.csv')
     i = 0
     urls['BookLinks'] = urls['BookLinks'] + '/reviews?reviewFilters={%22languageCode%22:%22en%22}'
