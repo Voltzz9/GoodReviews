@@ -14,13 +14,59 @@ library(tidyverse)
 library(tidytext)
 library(stringr)
 library(textdata)
+library(lubridate)
+library(ggplot2)
 ```
 
-Import the data
+Setting up custom themes
+```{r}
+darjeeling1 <- c("#FF0000", "#00A08A", "#F2AD00", "#F98400", "#5BBCD6")
+
+my_custom_theme <- theme_minimal() +
+  theme(
+    plot.background = element_rect(fill = "#f2e6c9", color = NA),
+    panel.background = element_rect(fill = "#f2e6c9", color = NA),
+    text = element_text(color = darjeeling1[2]),
+    axis.text = element_text(color = darjeeling1[2]),
+    axis.title = element_text(face = "bold", color = darjeeling1[4]),
+    legend.background = element_rect(fill = "#f2e6c9", color = NA),
+    legend.key = element_rect(fill = "#f2e6c9", color = NA),
+    panel.grid.major = element_line(color = "black", linewidth = 0.2),  # black gridlines
+    panel.grid.minor = element_line(color = "black", linewidth = 0.1)
+  )
+
+# Set as default theme
+theme_set(my_custom_theme)
+```
+
+## Import the data
 ```{r}
 reviews <- read.csv("data/goodreads_reviews_all.csv", header = TRUE)
+reviews %>% head()
+```
+## Data Preprocessing
+```{r}
+# Remove rows with missing values
+reviews <- reviews %>%
+  filter(!is.na(Review.Text))
+
+# Remove duplicate reviews
+reviews <- reviews %>%
+  distinct(Book.Title, Link, Review.Date, Review.Text, Review.Stars, Review.Likes)
+
+# Convert Review.Date to Date format
+reviews$Review.Date <- as.Date(reviews$Review.Date, format = "%B %d, %Y")
+
+# Remove all special characters and convert to lowercase
+reviews$Review.Text <- reviews$Review.Text %>%
+    str_replace_all("[^[:alnum:]\\s]", "") %>%   # Remove special characters
+    str_replace_all("\\s+", " ") %>%            # Replace multiple spaces/newlines/tabs with a single space
+    str_trim() %>%        # Trim leading and trailing whitespace
+    tolower()             # Convert to lowercase
 ```
 
+
+## Sentiment Analysis
 ```{r lexicons}
 get_sentiments("afinn") %>% head(10)
 get_sentiments("bing") %>% head(10)
@@ -39,9 +85,32 @@ reviews_sentiment <- reviews %>%
 # View the top 10 books by sentiment score
 head(reviews_sentiment, 10)
 ```
-
-
 ```{r nrc emotions}
+extended_palette <- colorRampPalette(darjeeling1)
+
+# Tokenize the review text into words and calculate sentiment counts
+sentiment_counts <- reviews %>%
+  unnest_tokens(word, Review.Text) %>%          # Tokenize review text into words
+  inner_join(get_sentiments("nrc"), by = "word") %>%      # Join with NRC lexicon
+  count(sentiment) %>%                          # Count occurrences of each sentiment
+  arrange(desc(n))
+
+# Reorder sentiment factor levels by count
+sentiment_counts$sentiment <- factor(sentiment_counts$sentiment, levels = sentiment_counts$sentiment)
+
+# Get the number of unique sentiments
+num_sentiments <- length(unique(sentiment_counts$sentiment))
+
+# Plot the sentiment counts as a bar graph with an extended Darjeeling color palette
+ggplot(sentiment_counts, aes(x = sentiment, y = n, fill = sentiment)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Sentiment Count in Book Reviews", x = "Sentiment", y = "Count") +
+  scale_fill_manual(values = extended_palette(num_sentiments)) +  # Extend the palette to match sentiments
+  theme(legend.position = "none")
+```
+
+
+```{r bing sentiments}
 bing_word_counts <- reviews %>%
   unnest_tokens(word, Review.Text) %>%
   inner_join(get_sentiments("bing")) %>%
@@ -62,13 +131,15 @@ bing_word_counts %>%
 First let's clean the dataset for our specific purpose. The words should also be tokenized and stopwords removed.
 
 ```{r tokenize}
+replace_reg <- "(https?:.*?([\\s]|[a-zA-Z0-9]$))|(www:.*?([\\s]|[a-zA-Z0-9]$))"
+unnest_reg <- "[^A-Za-z_\\d#@']"
 # Select the relevant columns
 words_rating_reviews <- reviews %>% 
   select(Review.Text, Review.Stars)
   
 # Tokenize the review text
 words_ratings <- words_rating_reviews %>%
-  unnest_tokens(word, Review.Text) %>%
+  unnest_tokens(word, Review.Text, token = "regex", pattern = unnest_reg, drop = FALSE) %>%
   anti_join(stop_words) # Remove stop words
 ```
 
@@ -94,8 +165,17 @@ top_words <- word_avg_ratings %>%
 # Display the results
 print(top_words)
 ```
+```{r}
+# Find the words with the highest ratings
+top_words <- word_avg_ratings %>%
+  arrange(avg_rating) %>%
+  head(20)
 
-As somewhat is to be expected, the common words that result in high reviews don't generlize well acrross books. No trend can easily be indentified from this top average rating list.
+# Display the results
+print(top_words)
+```
+
+As somewhat is to be expected, the common words that result in high reviews don't generalize well across books. No trend can easily be identified from this top average rating list.
 
 
 
@@ -103,6 +183,134 @@ As somewhat is to be expected, the common words that result in high reviews don'
 
 
 ## [Sentiment Analysis] Question: How does the sentiment of reviews correlate with the star rating given?
+
+```{r}
+# Calculate sentiment score for each review
+sentiment_scores <- reviews %>%
+  unnest_tokens(word, Review.Text) %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(Book.Title, Link, Review.Date, Review.Stars, Review.Likes) %>%
+  summarize(sentiment_score = sum(value), .groups = 'drop')
+
+# Calculate correlation
+correlation <- cor(sentiment_scores$Review.Stars, sentiment_scores$sentiment_score)
+
+# Visualize relationship between sentiment score and star rating
+ggplot(sentiment_scores, aes(x = sentiment_score, y = Review.Stars)) +
+  geom_jitter(alpha = 0.1, color = darjeeling1[1]) +
+  geom_smooth(method = "lm", se = FALSE, color = darjeeling1[2]) +
+  labs(title = "Sentiment Score vs. Star Rating",
+       x = "Sentiment Score",
+       y = "Star Rating",
+       subtitle = paste("Correlation:", round(correlation, 2))) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+```{r}
+# Average sentiment score by star rating
+avg_sentiment_by_stars <- sentiment_scores %>%
+  group_by(Review.Stars) %>%
+  summarize(avg_sentiment = mean(sentiment_score))
+
+ggplot(avg_sentiment_by_stars, aes(x = Review.Stars, y = avg_sentiment)) +
+  geom_col(fill = darjeeling1[3]) +
+  labs(title = "Average Sentiment Score by Star Rating",
+       x = "Star Rating",
+       y = "Average Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Sentiment over time
+sentiment_scores %>%
+  ggplot(aes(x = Review.Date, y = sentiment_score)) +
+  geom_smooth(method = "loess", se = FALSE, color = darjeeling1[4]) +
+  labs(title = "Sentiment Score Trend Over Time",
+       x = "Review Date",
+       y = "Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# Sentiment over time
+sentiment_scores %>%
+  ggplot(aes(x = Review.Date, y = sentiment_score)) +
+  geom_line(color = darjeeling1[4]) +
+  labs(title = "Sentiment Score Trend Over Time",
+       x = "Review Date",
+       y = "Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r avg sent per year bar}
+avg_sentiment_per_year <- sentiment_scores %>%
+  mutate(year = year(Review.Date)) %>%         # Extract the year from Review.Date
+  group_by(year) %>%                           # Group by year
+  summarize(avg_sentiment_score = mean(sentiment_score, na.rm = TRUE))  # Calculate average sentiment score
+
+# Plot the average sentiment score per year as a histogram
+ggplot(avg_sentiment_per_year, aes(x = year, y = avg_sentiment_score)) +
+  geom_col(fill = darjeeling1[4]) +  # Use geom_col to create a histogram
+  labs(title = "Average Sentiment Score per Year",
+       x = "Year",
+       y = "Average Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r avg sent per year line} 
+# Plot the average sentiment score per year
+ggplot(avg_sentiment_per_year, aes(x = year, y = avg_sentiment_score)) +
+  geom_line(color = darjeeling1[4]) +
+  labs(title = "Average Sentiment Score per Year",
+       x = "Year",
+       y = "Average Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r avg stars per year}
+# Calculate average stars per year
+avg_stars_per_year <- reviews %>%
+  mutate(year = year(Review.Date)) %>%         # Extract the year from Review.Date
+  group_by(year) %>%                           # Group by year
+  summarize(avg_stars = mean(Review.Stars, na.rm = TRUE))  # Calculate average stars per year
+
+# Plot both bar plot and line plot for average stars per year
+ggplot(avg_stars_per_year, aes(x = year, y = avg_stars)) +
+  geom_col(fill = darjeeling1[3], alpha = 0.7) +  # Bar plot with fill color and some transparency
+  geom_line(color = darjeeling1[4], size = 1.2) +  # Line plot with another color
+  geom_point(color = darjeeling1[4], size = 2) +   # Add points for each year on the line plot
+  labs(title = "Average Stars per Year",
+       x = "Year",
+       y = "Average Stars") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+# Correlation between sentiment score and likes
+likes_correlation <- cor(sentiment_scores$sentiment_score, sentiment_scores$Review.Likes)
+
+ggplot(sentiment_scores, aes(x = sentiment_score, y = Review.Likes)) +
+  geom_point(alpha = 0.1, color = darjeeling1[5]) +
+  geom_smooth(method = "lm", se = FALSE, color = darjeeling1[2]) +
+  labs(title = "Sentiment Score vs. Review Likes",
+       x = "Sentiment Score",
+       y = "Number of Likes",
+       subtitle = paste("Correlation:", round(likes_correlation, 2))) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+```{r}
+# Top books by average sentiment score
+top_books_sentiment <- sentiment_scores %>%
+  group_by(Book.Title) %>%
+  summarize(avg_sentiment = mean(sentiment_score),
+            avg_stars = mean(Review.Stars),
+            review_count = n()) %>%
+  arrange(desc(avg_sentiment)) %>%
+  head(10)
+
+print(top_books_sentiment)
+```
 
 ## [Topic Analysis] Question: What are the most common topics or themes discussed in positive vs. negative reviews?
 
