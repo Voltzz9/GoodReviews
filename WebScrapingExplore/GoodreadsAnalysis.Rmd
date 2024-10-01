@@ -59,6 +59,48 @@ bing_word_counts %>%
 ```
 
 ## [NLP] Question: Which review words resulted in highest rating?
+First let's clean the dataset for our specific purpose. The words should also be tokenized and stopwords removed.
+
+```{r tokenize}
+# Select the relevant columns
+words_rating_reviews <- reviews %>% 
+  select(Review.Text, Review.Stars)
+  
+# Tokenize the review text
+words_ratings <- words_rating_reviews %>%
+  unnest_tokens(word, Review.Text) %>%
+  anti_join(stop_words) # Remove stop words
+```
+
+```{r calc_avg_rating}
+# Calculate average ratings for each word
+word_avg_ratings <- words_ratings %>%
+  group_by(word) %>%
+  summarise(
+    avg_rating = mean(Review.Stars),
+    count = n()
+  ) %>%
+  filter(count >= 10)  # Filter words that appear at least 10 times
+```
+
+
+Now let's find the top words by average rating.
+```{r}
+# Find the words with the highest ratings
+top_words <- word_avg_ratings %>%
+  arrange(desc(avg_rating)) %>%
+  head(20)
+
+# Display the results
+print(top_words)
+```
+
+As somewhat is to be expected, the common words that result in high reviews don't generlize well acrross books. No trend can easily be indentified from this top average rating list.
+
+
+
+
+
 
 ## [Sentiment Analysis] Question: How does the sentiment of reviews correlate with the star rating given?
 
