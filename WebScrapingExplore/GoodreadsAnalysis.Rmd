@@ -58,3 +58,10 @@ bing_word_counts %>%
   labs(x = "Contribution to sentiment", y = NULL)
 ```
 
+## [NLP] Question: Which review words resulted in highest rating?
+
+## [Sentiment Analysis] Question: How does the sentiment of reviews correlate with the star rating given?
+
+## [Topic Analysis] Question: What are the most common topics or themes discussed in positive vs. negative reviews?
+
+## Question: Can we detect sarcasm or irony in reviews, and how does it relate to the overall rating?
