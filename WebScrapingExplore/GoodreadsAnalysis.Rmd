@@ -1,0 +1,60 @@
+---
+title: "Goodreads Reviews Analysis"
+author: "David Nicolay, Kellen Mossner, Matthew Holm"
+date: "2024-10-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load libraries}
+library(tidyverse)
+library(tidytext)
+library(stringr)
+library(textdata)
+```
+
+Import the data
+```{r}
+reviews <- read.csv("data/goodreads_reviews_all.csv", header = TRUE)
+```
+
+```{r lexicons}
+get_sentiments("afinn") %>% head(10)
+get_sentiments("bing") %>% head(10)
+get_sentiments("nrc") %>% head(10)
+```
+
+
+```{r}
+reviews_sentiment <- reviews %>%
+  unnest_tokens(word, Review.Text) %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(Book.Title) %>%
+  summarize(sentiment = sum(value)) %>%
+  arrange(desc(sentiment))
+
+# View the top 10 books by sentiment score
+head(reviews_sentiment, 10)
+```
+
+
+```{r nrc emotions}
+bing_word_counts <- reviews %>%
+  unnest_tokens(word, Review.Text) %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>%
+  ungroup() %>%
+  ggplot(aes(n, reorder(word, n), fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment", y = NULL)
+```
+
