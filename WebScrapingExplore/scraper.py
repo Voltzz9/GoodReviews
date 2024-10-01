@@ -107,7 +107,9 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
                         review_likes_element = review_element.find_element(By.CSS_SELECTOR, '.Button__container:nth-child(1) .Button--subdued .Button__labelItem')
                         review_likes = review_likes_element.text
                         # Extract only the number from the string
-                        review_likes = int(review_likes.split(' ')[0])
+                        review_likes = review_likes.split(' ')[0]
+                        review_likes = review_likes.replace(',', '')
+                        review_likes = int(review_likes)
                     except NoSuchElementException:
                         review_likes = 0
                     
