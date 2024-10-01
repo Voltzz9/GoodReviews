@@ -37,7 +37,16 @@ def scrape_with_selenium(url, max_reviews=100):
         review_elements = WebDriverWait(driver, 10).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'section.ReviewText'))
         )
+
+        previous_len = 0
         while len(review_elements) < max_reviews:
+            # Check if the number of reviews has increased
+            if len(review_elements) == previous_len:
+                print("Scraping failed, retrying...")
+                scrape_with_selenium(url, max_reviews)
+                return
+            previous_len = len(review_elements)
+
             print(f"Number of reviews found: {len(review_elements)}, continuing scraping")  # Debug print
             # Keep loading more reviews until the number of review elements exceeds max_reviews
             try:
@@ -120,7 +129,7 @@ def main():
         # Scrape the book
         i += 1
         scrape_with_selenium(url, max_reviews=120)  # Change max_reviews as needed
-        print(f"Book {i}/{num_books} scraped")
+        print(f"Book {i}/{num_books} scraped\n")
 
 if __name__ == "__main__":
     main()
