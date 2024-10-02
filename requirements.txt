@@ -29,3 +29,4 @@ websocket-client==1.8.0
 wsproto==1.2.0
 weaviate-client==4.8.1
 transformers==4.45.1
+langdetect==1.0.9
