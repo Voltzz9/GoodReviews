@@ -16,23 +16,34 @@ library(stringr)
 library(textdata)
 library(lubridate)
 library(ggplot2)
+library(showtext)
+library(ggridges)
+library(wordcloud2)
+library(plotly)
 ```
 
 Setting up custom themes
 ```{r}
-darjeeling1 <- c("#FF0000", "#00A08A", "#F2AD00", "#F98400", "#5BBCD6")
+darjeeling1 <- c("#B22222", "#00A08A", "#F2AD00", "#F98400", "#5BBCD6")
+axis_color <- "#2D2D2D"
+
+# Set the font for plots
+font_add_google("Montserrat") # Formal font
+showtext_auto()
 
 my_custom_theme <- theme_minimal() +
   theme(
     plot.background = element_rect(fill = "#f2e6c9", color = NA),
     panel.background = element_rect(fill = "#f2e6c9", color = NA),
-    text = element_text(color = darjeeling1[2]),
-    axis.text = element_text(color = darjeeling1[2]),
-    axis.title = element_text(face = "bold", color = darjeeling1[4]),
+    title = element_text(color = "#2D2D2D", size = 20, family = "Montserrat"),
+    axis.text = element_text(color = "#2D2D2D", size = 12, family = "Montserrat"),
+    axis.title = element_text(face = "bold", color = "#FF8500", size = 14, family = "Montserrat"),
     legend.background = element_rect(fill = "#f2e6c9", color = NA),
     legend.key = element_rect(fill = "#f2e6c9", color = NA),
-    panel.grid.major = element_line(color = "black", linewidth = 0.2),  # black gridlines
-    panel.grid.minor = element_line(color = "black", linewidth = 0.1)
+    panel.grid.major = element_line(color = "#2D2D2D", linewidth = 0.2),  # black gridlines
+    panel.grid.minor = element_line(color = "#2D2D2D", linewidth = 0.1),
+    axis.title.x = element_text(margin = margin(t = 15)),  # Add spacing to the top of the x-axis title
+    axis.title.y = element_text(margin = margin(r = 15))  # Add spacing to the right of the y-axis title
   )
 
 # Set as default theme
@@ -42,10 +53,15 @@ theme_set(my_custom_theme)
 ## Import the data
 ```{r}
 reviews <- read.csv("data/goodreads_reviews_all.csv", header = TRUE)
-reviews %>% head()
+head(reviews)
 ```
 ## Data Preprocessing
 ```{r}
+# Add Review.ID
+reviews <- reviews %>%
+  mutate(Review.ID = row_number()) %>%         # Add the Review.ID column
+  select(Review.ID, everything())  
+
 # Remove rows with missing values
 reviews <- reviews %>%
   filter(!is.na(Review.Text))
@@ -63,6 +79,109 @@ reviews$Review.Text <- reviews$Review.Text %>%
     str_replace_all("\\s+", " ") %>%            # Replace multiple spaces/newlines/tabs with a single space
     str_trim() %>%        # Trim leading and trailing whitespace
     tolower()             # Convert to lowercase
+```
+
+## Exploratory Data Analysis
+```{r dist of review stars}
+ggplot(reviews, aes(x = Review.Stars)) +
+  geom_histogram(binwidth = 1, fill = darjeeling1[2], color = "black", alpha = 0.8) +  # Set fill and outline colors
+  scale_x_continuous(breaks = 1:5) +  # Set x-axis breaks to 1-5
+  labs(title = "Distribution of Review Stars", x = "Review Stars", y = "Frequency")
+```
+We can see that the distribution of review stars is left skewed towards higher ratings, with a peak at 5 stars. This is a common pattern in review data, where people are more likely to leave reviews when they have strong positive or negative feelings about a product.
+
+Could just be we have more data from recent years book reviews.
+```{r}
+# Assuming the 'Review.Date' column is in Date format
+reviews <- reviews %>%
+  mutate(Year = format(Review.Date, "%Y"))  # Extract the year from the Review.Date
+
+# Summarize the count of reviews by Year and Review.Stars
+review_counts <- reviews %>%
+  group_by(Year, Review.Stars) %>%
+  summarise(Count = n(), .groups = 'drop')  # Count reviews for each year and star rating
+
+# Create the animated histogram with Plotly
+plot <- plot_ly(data = review_counts,
+                x = ~Review.Stars,
+                y = ~Count,
+                frame = ~Year,  # Use Year as the frame for animation
+                type = 'bar',   # Change to bar plot
+                name = 'Review Stars',
+                marker = list(color = darjeeling1, line = list(color = 'black', width = 1)),  # Set fill and outline colors
+                alpha = 0.8) %>%
+  layout(title = "Distribution of Review Stars by Year",
+         xaxis = list(title = "Review Stars", tickvals = 1:5),  # Set x-axis ticks to 1-5
+         yaxis = list(title = "Frequency"),
+         barmode = 'overlay') %>%
+  animation_opts(frame = 100, redraw = TRUE) %>%
+  animation_slider(currentvalue = list(prefix = "Year: "))  # Add a slider for year
+
+# Show the plot
+plot
+```
+
+
+Taking a look at the distribution of review stars for the top and worst rated books.
+```{r dist of stars for top 10 books}
+# Calculate average ratings and get the top and worst book
+top_and_worst_books <- reviews %>%
+  group_by(Book.Title) %>%
+  summarise(Average.Rating = mean(Review.Stars, na.rm = TRUE)) %>%
+  arrange(Average.Rating) %>%
+  slice(c(n(), 1))  # Select the top (last) and worst (first) book, reversing their order
+
+# Filter reviews for the top and worst books
+top_worst_reviews <- reviews %>%
+  filter(Book.Title %in% top_and_worst_books$Book.Title)
+
+# Create a ridgeline plot for the top and worst book
+ggplot(top_worst_reviews, aes(x = Review.Stars, y = Book.Title, fill = Book.Title)) +
+  geom_density_ridges(stat = "binline", bins = 5, alpha = 0.8,) +
+  scale_fill_manual(values = darjeeling1[c(1, 2)]) +  # Use first two colors from darjeeling1 for fill
+  labs(title = "Distribution of Review Stars for Top and Worst Books",
+       x = "Review Stars",
+       y = "Book Title") +
+  theme(legend.position = "none") 
+```
+
+Wow shocking.
+```{r wordcloud}
+# Tokenize the review text into words
+word_counts <- reviews %>%
+  unnest_tokens(word, Review.Text) %>%  # Tokenize review text into words
+  count(word, sort = TRUE) %>%          # Count occurrences of each word
+  filter(!word %in% stop_words$word)    # Remove stop words
+
+# Create a word cloud using wordcloud2
+wordcloud2(data = word_counts, size = 1, minSize = 1, shape = 'circle')
+```
+```{r wordcloud w/o book}
+# Tokenize the review text into words
+word_counts <- reviews %>%
+  unnest_tokens(word, Review.Text) %>%  # Tokenize review text into words
+  count(word, sort = TRUE) %>%          # Count occurrences of each word
+  filter(!word %in% stop_words$word) %>%   # Remove stop words
+  filter(!word %in% 'book', !word %in% 'books')
+
+# Create a word cloud using wordcloud2
+wordcloud2(data = word_counts, size = 1, minSize = 1, shape = 'circle')
+```
+
+```{r}
+ggplot(reviews, aes(x = reorder(Book.Title, Review.Stars), y = Review.Stars)) +
+  geom_boxplot(fill = "#F98400") +
+  coord_flip() +  # Flip for readability
+  labs(title = "Box Plot of Ratings by Book Title", x = "Book Title", y = "Rating")
+
+reviews %>%
+  mutate(YearMonth = format(Review.Date, "%Y-%m")) %>%
+  group_by(YearMonth) %>%
+  summarise(Review_Count = n()) %>%
+  ggplot(aes(x = YearMonth, y = Review_Count)) +
+  geom_line(color = "#00A08A") +
+  labs(title = "Number of Reviews Over Time", x = "Date", y = "Count of Reviews") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 
@@ -101,12 +220,13 @@ sentiment_counts$sentiment <- factor(sentiment_counts$sentiment, levels = sentim
 # Get the number of unique sentiments
 num_sentiments <- length(unique(sentiment_counts$sentiment))
 
-# Plot the sentiment counts as a bar graph with an extended Darjeeling color palette
 ggplot(sentiment_counts, aes(x = sentiment, y = n, fill = sentiment)) +
-  geom_bar(stat = "identity") +
+  geom_bar(stat = "identity", width = 0.9) +
   labs(title = "Sentiment Count in Book Reviews", x = "Sentiment", y = "Count") +
   scale_fill_manual(values = extended_palette(num_sentiments)) +  # Extend the palette to match sentiments
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)) + # Customize axis titles
+  scale_y_continuous(labels = scales::comma) 
 ```
 
 
@@ -124,7 +244,10 @@ bing_word_counts %>%
   ggplot(aes(n, reorder(word, n), fill = sentiment)) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~sentiment, scales = "free_y") +
-  labs(x = "Contribution to sentiment", y = NULL)
+  labs(x = "Contribution to sentiment", y = NULL,title = "Top words contributing to sentiment") +
+  scale_fill_manual(values = c("positive" = darjeeling1[5],   # Set a color for positive sentiment
+                               "negative" = darjeeling1[1])) +  # Set a color for negative sentiment
+  theme(strip.text = element_text(size = 14))
 ```
 
 ## [NLP] Question: Which review words resulted in highest rating?
@@ -213,7 +336,7 @@ avg_sentiment_by_stars <- sentiment_scores %>%
   summarize(avg_sentiment = mean(sentiment_score))
 
 ggplot(avg_sentiment_by_stars, aes(x = Review.Stars, y = avg_sentiment)) +
-  geom_col(fill = darjeeling1[3]) +
+  geom_col(fill = darjeeling1) +
   labs(title = "Average Sentiment Score by Star Rating",
        x = "Star Rating",
        y = "Average Sentiment Score") +
@@ -230,16 +353,7 @@ sentiment_scores %>%
        y = "Sentiment Score") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-```{r}
-# Sentiment over time
-sentiment_scores %>%
-  ggplot(aes(x = Review.Date, y = sentiment_score)) +
-  geom_line(color = darjeeling1[4]) +
-  labs(title = "Sentiment Score Trend Over Time",
-       x = "Review Date",
-       y = "Sentiment Score") +
-  theme(plot.title = element_text(hjust = 0.5))
-```
+
 ```{r avg sent per year bar}
 avg_sentiment_per_year <- sentiment_scores %>%
   mutate(year = year(Review.Date)) %>%         # Extract the year from Review.Date
@@ -258,7 +372,7 @@ ggplot(avg_sentiment_per_year, aes(x = year, y = avg_sentiment_score)) +
 ```{r avg sent per year line} 
 # Plot the average sentiment score per year
 ggplot(avg_sentiment_per_year, aes(x = year, y = avg_sentiment_score)) +
-  geom_line(color = darjeeling1[4]) +
+  geom_line(color = darjeeling1[4], linewidth = 1) +
   labs(title = "Average Sentiment Score per Year",
        x = "Year",
        y = "Average Sentiment Score") +
@@ -274,7 +388,7 @@ avg_stars_per_year <- reviews %>%
 
 # Plot both bar plot and line plot for average stars per year
 ggplot(avg_stars_per_year, aes(x = year, y = avg_stars)) +
-  geom_col(fill = darjeeling1[3], alpha = 0.7) +  # Bar plot with fill color and some transparency
+  geom_col(fill = darjeeling1[1], alpha = 0.7) +  # Bar plot with fill color and some transparency
   geom_line(color = darjeeling1[4], size = 1.2) +  # Line plot with another color
   geom_point(color = darjeeling1[4], size = 2) +   # Add points for each year on the line plot
   labs(title = "Average Stars per Year",
