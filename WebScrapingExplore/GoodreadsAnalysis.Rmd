@@ -414,18 +414,210 @@ ggplot(sentiment_scores, aes(x = sentiment_score, y = Review.Likes)) +
 ```
 
 ```{r}
-# Top books by average sentiment score
-top_books_sentiment <- sentiment_scores %>%
+unordered_books_sentiment <- sentiment_scores %>%
   group_by(Book.Title) %>%
   summarize(avg_sentiment = mean(sentiment_score),
             avg_stars = mean(Review.Stars),
-            review_count = n()) %>%
-  arrange(desc(avg_sentiment)) %>%
-  head(10)
+            review_count = n())
 
-print(top_books_sentiment)
+print(unordered_books_sentiment)
 ```
 
 ## [Topic Analysis] Question: What are the most common topics or themes discussed in positive vs. negative reviews?
+```{r}
+# Assuming `reviews_df` contains the columns `Book.Title` and `Review.Text`
+top_book_reviews <- unordered_books_sentiment %>%
+  inner_join(reviews, by = "Book.Title") %>%
+  select(Book.Title, Review.Text, Review.Stars, avg_sentiment) 
+
+top_book_reviews <- top_book_reviews %>%
+  mutate(review_type = case_when(
+    Review.Stars >= 4 ~ "Positive",
+    Review.Stars <= 2 ~ "Negative",
+    TRUE ~ "Neutral"  # You can handle neutral reviews differently if desired
+  ))
+
+# Tokenize the review text
+tokenized_reviews <- top_book_reviews %>%
+  unnest_tokens(word, Review.Text)
+
+# Remove stop words
+data("stop_words")
+tokenized_reviews <- tokenized_reviews %>%
+  anti_join(stop_words, by = "word")
+
+# Count the most frequent words in positive and negative reviews
+word_count <- tokenized_reviews %>%
+  filter(review_type != "Neutral") %>%
+  group_by(review_type, word) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+# Top words in positive reviews
+top_positive_words <- word_count %>%
+  filter(review_type == "Positive") %>%
+  arrange(desc(count)) %>%
+  head(50)
+
+# Top words in negative reviews
+top_negative_words <- word_count %>%
+  filter(review_type == "Negative") %>%
+  arrange(desc(count)) %>%
+  head(50)
+
+# View results
+top_positive_words
+top_negative_words
+
+# View the result
+# top_book_reviews
+```
+From this, we can see a lot of overlap (which makes sense in most cases since certain words are very likely to be used in book reviews in general - i.e. book, read, people, time). It would seem helpful to exclude these overlapping words when trying to distinguish unique themes or topics, but this would shrink the word counts (particularly for negative reviews) as shown below.
+
+```{r}
+# Step 1: Identify overlapping words
+cleaned_word_count <- word_count %>%
+  filter(str_detect(word, "^[a-zA-Z]+$"))  %>%   # Keep only English alphabetic words
+  filter(!str_detect(word, "\\d"))  
+
+
+overlap_words <- intersect(
+  cleaned_word_count %>% filter(review_type == "Positive") %>% pull(word),
+  cleaned_word_count %>% filter(review_type == "Negative") %>% pull(word)
+)
+
+# Step 2: Exclude overlapping words
+filtered_word_count <- cleaned_word_count %>%
+  filter(!word %in% overlap_words)
+
+# Step 3: Get the top unique words for positive reviews
+top_positive_unique_words <- filtered_word_count %>%
+  filter(review_type == "Positive") %>%
+  arrange(desc(count)) %>%
+  head(50)
+# Step 4: Get the top unique words for negative reviews
+top_negative_unique_words <- filtered_word_count %>%
+  filter(review_type == "Negative") %>%
+  arrange(desc(count)) %>%
+  head(50)
+
+# View the results
+top_positive_unique_words
+top_negative_unique_words
+```
+Besides the names of authors/characters, words like:
+- Eyeopening
+- Enchanting
+- Improvements
+- Enthralling
+stand out for positive reviews, while words like:
+- Causation&Correlation
+- Unoriginal
+- Ableism
+stand out for negative reviews. While this is definitely not an entirely accurate representation, it seems that positive reviews tend to discuss themes of charm, excitement and insightfulness. "Improvements" could very well refer to a series of books that were reviewed. Negative reviews discuss themes of unoriginality (which is a prevalent criticism among avid readers). Causation and Correlation is also referred to quite often - which could point to criticisms of plot and story lines. 
+
+
+
 
 ## Question: Can we detect sarcasm or irony in reviews, and how does it relate to the overall rating?
+
+Sarcasm and irony are very challenging concepts to detect. A rudimentary way of tackling such an issue like this could be further sentiment analysis. This would entail analyzing negative reviews that contain positive sentiment.
+```{r}
+sentiment_scores <- top_book_reviews %>%
+  unnest_tokens(word, Review.Text) %>%            # Tokenize the review text
+  inner_join(get_sentiments("bing"), by = "word") %>%  # Join with sentiment lexicon
+  count(Book.Title, Review.Stars, sentiment) %>%  # Count occurrences of positive/negative words
+  spread(sentiment, n, fill = 0) %>%               # Spread sentiment into separate columns
+  mutate(sentiment_score = positive - negative)     # Calculate sentiment score
+# View sentiment scores
+print(sentiment_scores)
+```
+
+From here, we can plot which books have the greatest sentiment score for reviews with less than 3 stars - which could direct us to reviews that have sarcasm/irony.
+
+
+```{r}
+sarcastic_books <- sentiment_scores %>%
+  filter(Review.Stars < 3, sentiment_score > 0) 
+
+# Print the resulting books
+print(sarcastic_books)
+
+# Step 2: Limit to top 10 books by sentiment score
+top_n_books <- sarcastic_books %>%
+  arrange(desc(sentiment_score)) %>%
+  head(10)  # Change this number to show more or fewer books
+
+# Print the resulting top books
+print(top_n_books)
+
+# Step 3: Create a plot for the top books
+ggplot(top_n_books, aes(x = reorder(Book.Title, -sentiment_score), y = sentiment_score)) +
+  geom_col(fill = "skyblue") +
+  labs(title = "Top 10 Books with Less Than 3 Stars and Positive Sentiment",
+       x = "Book Title",
+       y = "Sentiment Score") +
+  coord_flip() +  # Flip the axes for better readability
+  theme_minimal()
+```
+For these books to have 1 or 2 star reviews with such high sentiment scores definitely indicate that there is probably some form of expression where the intended meaning differs from the literal meaning of the words used.
+After seeing these results, all that is left is to read the reviews ourselves to gauge whether or not these reviews contain verbal irony.
+
+```{r}
+
+average_ratings <- reviews %>%
+  group_by(Book.Title) %>%
+  summarize(avg_rating = mean(Review.Stars))  # Use na.rm to handle any NA values
+
+print(average_ratings)
+
+# Filter for sarcastic reviews
+sarcastic_reviews <- sentiment_scores %>%
+  filter(sentiment_score > 0, Review.Stars <= 2) 
+
+# Create a sarcasm indicator in the sarcastic_reviews dataframe
+sarcastic_reviews <- sarcastic_reviews %>%
+  mutate(sarcasm = 1)  # Mark sarcastic reviews
+
+# Create a non-sarcastic data frame for comparison
+non_sarcastic_reviews <- sentiment_scores %>%
+  filter(!(sentiment_score > 0 & Review.Stars <= 2)) %>%  # Exclude sarcastic reviews
+  mutate(sarcasm = 0)  # Mark non-sarcastic reviews
+
+# Combine both data frames
+combined_reviews <- bind_rows(sarcastic_reviews, non_sarcastic_reviews)
+
+# Merge with average ratings to include average book rating
+final_analysis <- combined_reviews %>%
+  group_by(Book.Title) %>%
+  summarize(avg_rating = mean(Review.Stars, na.rm = TRUE), 
+            sentiment_score = mean(sentiment_score, na.rm = TRUE),
+            sarcasm = first(sarcasm))  # Use first(sarcasm) to get sarcasm indicator
+# Calculate correlation between sentiment score and average rating
+correlation_result <- cor(final_analysis$sentiment_score, final_analysis$avg_rating)
+print(paste("Correlation between sentiment score and average book rating:", correlation_result))
+
+# Run a linear regression analysis
+model <- lm(avg_rating ~ sentiment_score + sarcasm, data = final_analysis)
+summary(model)
+
+library(ggplot2)
+
+# Create a scatter plot
+ggplot(final_analysis, aes(x = sentiment_score, y = avg_rating, color = factor(sarcasm))) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Sentiment Score vs. Average Book Rating",
+       x = "Sentiment Score",
+       y = "Average Book Rating",
+       color = "Sarcasm Indicator") +
+  theme_minimal()
+
+
+```
+Based on what we see above, we note that:
+- Reviews marked as sarcastic tend to lower the average ratings despite having potentially positive sentiment
+- The p-value for the sarcasm coefficient is very low (4.32e-09), indicating that the effect of sarcasm on average book ratings is statistically significant. It's also important to note the very low R-squared value though, indicating other factors play a more substantial role in influencing book ratings.
+-Reviews that contain sarcastic remarks may mislead potential readers into thinking a book is being praised, when in reality, it is being criticized. This disconnect can lead to lower ratings as readers might find that the book does not meet their expectations.
+
+In conclusion, it is fair to say that there MIGHT be some evidence of sarcastic reviews having an impact on the overall rating, but it is more likely that other variables a more important in predicting overall review scores.
