@@ -7,7 +7,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 import time
-import datetime
 import csv
 import re
 import os
@@ -28,7 +27,6 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
 
         try:
             driver.get(url)
-            print(f"Page title: {driver.title}")  # Debug print
             
             # Extract book title
             title_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'h1.Text.H1Title[itemprop="name"] a')))
@@ -41,33 +39,51 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
             print(f"Author: {author_name}")  # Debug print
             
             # Extract first publication date NOT WORKING
-            # publication_info = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="publicationInfo"]')))
-            # publication_text = publication_info.text
-            # print(f"Publication info: {publication_text}")  # Debug print
-            # # Extract the date part
-            publication_date = ""
-            # print(f"First publication date: {publication_date}")  # Debug print
-                
-            # Extract book genres
+            publication_info = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="publicationInfo"]')))
+            publication_text = publication_info.text
+            print(f"Publication info: {publication_text}")  # Debug print
+            # Extract the date part
+            publication_date = publication_text
+            print(f"First publication date: {publication_date}")  # Debug print
+            
+            # Extract genres
+            genres_e = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_all_elements_located((By.CSS_SELECTOR, '.BookPageMetadataSection__genreButton .Button__labelItem'))
+                )
+            if genres_e:
+                print("THE FUCKING GENRES ARE THERE!!!")
             genres = []
             try:
-                # Find and click the "...more" button to reveal all genres
-                more_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '.CollapsableList .Button--medium[aria-label="Show all items in the list"]')))
-                driver.execute_script("arguments[0].scrollIntoView();", more_button)
-                time.sleep(1)
-                try:
-                    more_button.click()
-                except ElementClickInterceptedException:
-                    # If direct click fails, try using JavaScript
-                    driver.execute_script("arguments[0].click();", more_button)
+                # Try to find the "...more" button and click it if present
+                more_button = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '.CollapsableList .Button--medium[aria-label="Show all items in the list"]'))
+                )
+ 
+                if more_button:
+                    print("Found '...more' button for genres")
+                    driver.execute_script("arguments[0].scrollIntoView();", more_button)
+                    time.sleep(1)
+                    try:
+                        more_button.click()
+                    except ElementClickInterceptedException:
+                        driver.execute_script("arguments[0].click();", more_button)
+                    time.sleep(3)  # Increased sleep time to allow page to load completely
+                    print("Clicked '...more' button for genres")
+
+                # Scroll the page after clicking the button to ensure genres are visible
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(2)
-                # Wait for the genres to be visible after clicking
-                WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, '.CollapsableList .BookPageMetadataSection__genreButton .Button__labelItem')))
-                
+
                 # Now extract all genre elements
-                genre_elements = driver.find_elements(By.CSS_SELECTOR, '.CollapsableList .BookPageMetadataSection__genreButton .Button__labelItem')
+                genre_elements = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_all_elements_located((By.CSS_SELECTOR, '.BookPageMetadataSection__genreButton .Button__labelItem'))
+                )
+
                 genres = [genre.text for genre in genre_elements]
-                print(f"Book genres: {', '.join(genres)}")  # Debug print
+                
+                # Debug print to see the extracted genres
+                print(f"Book genres: {', '.join(genres)}")
+
             except TimeoutException:
                 print("Could not find or click the '...more' button for genres")
             except Exception as e:
