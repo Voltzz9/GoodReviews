@@ -27,70 +27,16 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
 
         try:
             driver.get(url)
+            print(f"Page title: {driver.title}")  # Debug print
             
             # Extract book title
-            title_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'h1.Text.H1Title[itemprop="name"] a')))
+            wait = WebDriverWait(driver, 10)
+            title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'h1.Text.H1Title[itemprop="name"] a')))
             book_title = title_element.text
             print(f"Book title: {book_title}")  # Debug print
             
-            # Extract author name
-            author_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.ContributorLink__name')))
-            author_name = author_element.text
-            print(f"Author: {author_name}")  # Debug print
-            
-            # Extract first publication date NOT WORKING
-            publication_info = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="publicationInfo"]')))
-            publication_text = publication_info.text
-            print(f"Publication info: {publication_text}")  # Debug print
-            # Extract the date part
-            publication_date = publication_text
-            print(f"First publication date: {publication_date}")  # Debug print
-            
-            # Extract genres
-            genres_e = WebDriverWait(driver, 10).until(
-                    EC.visibility_of_all_elements_located((By.CSS_SELECTOR, '.BookPageMetadataSection__genreButton .Button__labelItem'))
-                )
-            if genres_e:
-                print("THE FUCKING GENRES ARE THERE!!!")
-            genres = []
-            try:
-                # Try to find the "...more" button and click it if present
-                more_button = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.CollapsableList .Button--medium[aria-label="Show all items in the list"]'))
-                )
- 
-                if more_button:
-                    print("Found '...more' button for genres")
-                    driver.execute_script("arguments[0].scrollIntoView();", more_button)
-                    time.sleep(1)
-                    try:
-                        more_button.click()
-                    except ElementClickInterceptedException:
-                        driver.execute_script("arguments[0].click();", more_button)
-                    time.sleep(3)  # Increased sleep time to allow page to load completely
-                    print("Clicked '...more' button for genres")
-
-                # Scroll the page after clicking the button to ensure genres are visible
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
-
-                # Now extract all genre elements
-                genre_elements = WebDriverWait(driver, 10).until(
-                    EC.visibility_of_all_elements_located((By.CSS_SELECTOR, '.BookPageMetadataSection__genreButton .Button__labelItem'))
-                )
-
-                genres = [genre.text for genre in genre_elements]
-                
-                # Debug print to see the extracted genres
-                print(f"Book genres: {', '.join(genres)}")
-
-            except TimeoutException:
-                print("Could not find or click the '...more' button for genres")
-            except Exception as e:
-                print(f"Error extracting genres: {str(e)}")
-
             # Extract total number of reviews
-            reviews_count_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'span[data-testid="reviewsCount"]')))
+            reviews_count_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'span[data-testid="reviewsCount"]')))
             reviews_count_text = reviews_count_element.text.split()[0].replace(',', '')
             total_reviews = int(reviews_count_text)
             print(f"Total reviews for this book: {total_reviews}")
@@ -161,9 +107,7 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
                         review_likes_element = review_element.find_element(By.CSS_SELECTOR, '.Button__container:nth-child(1) .Button--subdued .Button__labelItem')
                         review_likes = review_likes_element.text
                         # Extract only the number from the string
-                        review_likes = review_likes.split(' ')[0]
-                        review_likes = review_likes.replace(',', '')
-                        review_likes = int(review_likes)
+                        review_likes = int(review_likes.split(' ')[0])
                     except NoSuchElementException:
                         review_likes = 0
                     
@@ -185,11 +129,11 @@ def scrape_with_selenium(url, max_reviews=100, max_retries=5):
                 writer = csv.writer(file)
                 # Write the header only if the file is being created
                 if not file_exists:
-                    writer.writerow(['Book Title', 'Author', 'First Publication Date', 'Link', 'Genres', 'Review Text', 'Review Date', 'Review Stars', 'Review Likes'])
+                    writer.writerow(['Book Title', 'Link', 'Review Text', 'Review Date', 'Review Stars', 'Review Likes'])
                 # Write the reviews to the CSV file
                 for review in reviews:
                     cleaned_review = re.sub(r'\s+', ' ', review[0]).strip()
-                    writer.writerow([book_title, author_name, publication_date, url, '|'.join(genres), cleaned_review, review[1], review[2], review[3]])
+                    writer.writerow([book_title, url, cleaned_review, review[1], review[2], review[3]])
             print(f"Reviews saved to data/goodreads_reviews_all.csv. Total reviews scraped: {len(reviews)}")
             
             # If we've reached this point without exceptions, we can break the retry loop
