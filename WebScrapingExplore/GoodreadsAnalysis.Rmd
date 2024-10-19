@@ -20,6 +20,8 @@ library(showtext)
 library(ggridges)
 library(wordcloud2)
 library(plotly)
+library(knitr)
+library(cld2)
 ```
 
 Setting up custom themes
@@ -33,13 +35,13 @@ showtext_auto()
 
 my_custom_theme <- theme_minimal() +
   theme(
-    plot.background = element_rect(fill = "#f2e6c9", color = NA),
-    panel.background = element_rect(fill = "#f2e6c9", color = NA),
+    plot.background = element_rect(fill = "#fff8e8", color = NA),
+    panel.background = element_rect(fill = "#fff8e8", color = NA),
     title = element_text(color = "#2D2D2D", size = 20, family = "Montserrat"),
     axis.text = element_text(color = "#2D2D2D", size = 12, family = "Montserrat"),
     axis.title = element_text(face = "bold", color = "#FF8500", size = 14, family = "Montserrat"),
-    legend.background = element_rect(fill = "#f2e6c9", color = NA),
-    legend.key = element_rect(fill = "#f2e6c9", color = NA),
+    legend.background = element_rect(fill = "#fff8e8", color = NA),
+    legend.key = element_rect(fill = "#fff8e8", color = NA),
     panel.grid.major = element_line(color = "#2D2D2D", linewidth = 0.2),  # black gridlines
     panel.grid.minor = element_line(color = "#2D2D2D", linewidth = 0.1),
     axis.title.x = element_text(margin = margin(t = 15)),  # Add spacing to the top of the x-axis title
@@ -53,8 +55,24 @@ theme_set(my_custom_theme)
 ## Import the data
 ```{r}
 reviews <- read.csv("data/goodreads_reviews_all.csv", header = TRUE)
-head(reviews)
+book_genres <- read.csv("data/book_info.csv")
+
+reviews$language <- detect_language(reviews$Review.Text)
+# Filter the dataset to keep only English reviews
+reviews <- reviews %>%
+  filter(language == "en")
+genres_list <- unlist(strsplit(book_genres$Genres, ", "))
+unique_genres <- unique(genres_list)
+
+# Create a new data frame with the books genres
+full_reviews <- reviews %>%
+  inner_join(book_genres, by = c("Book.Title" = "Book.Title"))  # Join reviews with book genres
+
+kable(reviews)
+kable(book_genres)
+kable(full_reviews)
 ```
+
 ## Data Preprocessing
 ```{r}
 # Add Review.ID
@@ -135,53 +153,31 @@ top_and_worst_books <- reviews %>%
 top_worst_reviews <- reviews %>%
   filter(Book.Title %in% top_and_worst_books$Book.Title)
 
-# Create a ridgeline plot for the top and worst book
-ggplot(top_worst_reviews, aes(x = Review.Stars, y = Book.Title, fill = Book.Title)) +
-  geom_density_ridges(stat = "binline", bins = 5, alpha = 0.8,) +
-  scale_fill_manual(values = darjeeling1[c(1, 2)]) +  # Use first two colors from darjeeling1 for fill
+# Create a separate distribution plot for each book
+ggplot(top_worst_reviews, aes(x = Review.Stars, fill = Book.Title)) +
+  geom_histogram(alpha = 0.8, color = "black", binwidth = 1) +  # Create bar plots for the distribution of stars
+  facet_wrap(~ Book.Title, ncol = 2) +  # Create two separate plots side by side
+  scale_fill_manual(values = darjeeling1[c(1, 2)]) +
   labs(title = "Distribution of Review Stars for Top and Worst Books",
        x = "Review Stars",
-       y = "Book Title") +
-  theme(legend.position = "none") 
+       y = "Number of Reviews") +
+  theme(legend.position = "none",   # Remove the legend
+        plot.title = element_text(hjust = 0.5, size = 14),  # Center and adjust title size
+        plot.margin = margin(t = 20, r = 10, b = 10, l = 10))  # Add margin space around the plot
 ```
+Although the reviews for The Holy Bible: King James Version are mostly 1-star reviews, the average rating for the book on goodreads.com is 4.44. We filtered reviews for each book by most popular reviews so it is unclear why most of the popular reviews are 1-star reviews.
 
-Wow shocking.
+The most common words used in reviews, excluding the stop words and the words "book", "books" and "read".
 ```{r wordcloud}
 # Tokenize the review text into words
 word_counts <- reviews %>%
   unnest_tokens(word, Review.Text) %>%  # Tokenize review text into words
   count(word, sort = TRUE) %>%          # Count occurrences of each word
-  filter(!word %in% stop_words$word)    # Remove stop words
-
-# Create a word cloud using wordcloud2
-wordcloud2(data = word_counts, size = 1, minSize = 1, shape = 'circle')
-```
-```{r wordcloud w/o book}
-# Tokenize the review text into words
-word_counts <- reviews %>%
-  unnest_tokens(word, Review.Text) %>%  # Tokenize review text into words
-  count(word, sort = TRUE) %>%          # Count occurrences of each word
   filter(!word %in% stop_words$word) %>%   # Remove stop words
-  filter(!word %in% 'book', !word %in% 'books')
+  filter(!word %in% 'book', !word %in% 'books', !word %in% 'read')
 
 # Create a word cloud using wordcloud2
 wordcloud2(data = word_counts, size = 1, minSize = 1, shape = 'circle')
-```
-
-```{r}
-ggplot(reviews, aes(x = reorder(Book.Title, Review.Stars), y = Review.Stars)) +
-  geom_boxplot(fill = "#F98400") +
-  coord_flip() +  # Flip for readability
-  labs(title = "Box Plot of Ratings by Book Title", x = "Book Title", y = "Rating")
-
-reviews %>%
-  mutate(YearMonth = format(Review.Date, "%Y-%m")) %>%
-  group_by(YearMonth) %>%
-  summarise(Review_Count = n()) %>%
-  ggplot(aes(x = YearMonth, y = Review_Count)) +
-  geom_line(color = "#00A08A") +
-  labs(title = "Number of Reviews Over Time", x = "Date", y = "Count of Reviews") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 
@@ -192,18 +188,50 @@ get_sentiments("bing") %>% head(10)
 get_sentiments("nrc") %>% head(10)
 ```
 
-
+The top ten books with the highest total sentiment score across all reviews, as well the bottom ten books with the lowest total sentiment score across all reviews.
 ```{r}
 reviews_sentiment <- reviews %>%
   unnest_tokens(word, Review.Text) %>%
   inner_join(get_sentiments("afinn")) %>%
   group_by(Book.Title) %>%
-  summarize(sentiment = sum(value)) %>%
+  summarize(sentiment = sum(value), avg_rating = mean(Review.Stars)) %>%
   arrange(desc(sentiment))
 
 # View the top 10 books by sentiment score
 head(reviews_sentiment, 10)
+reviews_sentiment %>% arrange(sentiment) %>% head(10)
 ```
+The book Night has the lowest total sentiment score across all reviews yet it also has the highest average rating across all reviews.
+
+### Genres for top and worst rated books
+```{r}
+# Join the reviews_sentiment dataset with the books_genres dataset
+sentiment_with_genres <- reviews_sentiment %>%
+  left_join(book_genres, by = "Book.Title")
+
+# Get the top 10 highest sentiment books
+top_highest_sentiment <- sentiment_with_genres %>%
+  arrange(desc(sentiment)) %>%
+  head(10)
+
+# Get the top 10 lowest sentiment books
+top_lowest_sentiment <- sentiment_with_genres %>%
+  arrange(sentiment) %>%
+  head(10)
+
+# Print the results
+print("Top 10 Highest Sentiment Books with Genres:")
+print(top_highest_sentiment %>%
+  select(Book.Title, Genres, sentiment, avg_rating))
+
+print("Top 10 Lowest Sentiment Books with Genres:")
+print(top_lowest_sentiment %>%
+  select(Book.Title, Genres, sentiment, avg_rating))
+
+```
+Upon investigating the genres for the book Night, we see that the book is a historical biography about the holocaust which explains the low sentiment score for all the reviews.
+It is evident that the sentiment score is not a good indicator of the overall rating of a book. This is because the sentiment score is based on the sentiment of the words used in the reviews, which may not always reflect the overall sentiment of the review. For example, a review may contain positive sentiment words but still give a low rating to the book, or vice versa.
+
 ```{r nrc emotions}
 extended_palette <- colorRampPalette(darjeeling1)
 
@@ -289,7 +317,7 @@ top_words <- word_avg_ratings %>%
 print(top_words)
 ```
 ```{r}
-# Find the words with the highest ratings
+# Find the words with the lowest ratings
 top_words <- word_avg_ratings %>%
   arrange(avg_rating) %>%
   head(20)
@@ -353,6 +381,47 @@ sentiment_scores %>%
        y = "Sentiment Score") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
+```{r}
+# Filter for the top-rated book
+top_rated_book <- reviews %>%
+  group_by(Book.Title) %>%
+  summarise(average_rating = mean(Review.Stars, na.rm = TRUE)) %>%
+  top_n(1, wt = average_rating)
+
+# Filter reviews for that top-rated book
+top_book_reviews <- reviews %>%
+  filter(Book.Title == top_rated_book$Book.Title[1])
+
+# Assuming you have sentiment scores already computed in 'sentiment_scores'
+# Merge or filter your sentiment_scores dataframe for the top-rated book reviews
+top_book_sentiment <- sentiment_scores %>%
+  filter(Book.Title == top_rated_book$Book.Title[1])
+
+# Plot sentiment over time for the top-rated book
+ggplot(top_book_sentiment, aes(x = Review.Date, y = sentiment_score)) +
+  geom_smooth(method = "loess", se = FALSE, color = darjeeling1[4]) +
+  labs(title = paste("Sentiment Score Trend Over Time for", top_rated_book$Book.Title[1]),
+       x = "Review Date",
+       y = "Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# Calculate average sentiment per year
+avg_sentiment_per_year <- top_book_sentiment %>%
+  mutate(year = year(Review.Date)) %>%   # Extract the year from Review.Date
+  group_by(year) %>%                     # Group by year
+  summarize(avg_sentiment_score = mean(sentiment_score, na.rm = TRUE))  # Calculate average sentiment score
+
+# Plot the average sentiment score per year as a histogram
+ggplot(avg_sentiment_per_year, aes(x = year, y = avg_sentiment_score)) +
+  geom_col(fill = darjeeling1[4]) +  # Use geom_col to create a bar plot
+  labs(title = paste("Average Sentiment Score per Year for", top_rated_book$Book.Title[1]),
+       x = "Year",
+       y = "Average Sentiment Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
 
 ```{r avg sent per year bar}
 avg_sentiment_per_year <- sentiment_scores %>%
