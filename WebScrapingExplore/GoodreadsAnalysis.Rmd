@@ -544,8 +544,6 @@ print(paste("Correlation between sentiment score and average book rating:", corr
 model <- lm(avg_rating ~ sentiment_score + sarcasm, data = final_analysis)
 summary(model)
 
-library(ggplot2)
-
 # Create a scatter plot
 ggplot(final_analysis, aes(x = sentiment_score, y = avg_rating, color = factor(sarcasm))) +
   geom_point(alpha = 0.6) +
