@@ -1,11 +1,16 @@
 ﻿
-## <u>GoodBooks Reviews Analysis</u>
+## <u>GoodReads Review Analysis</u>
+Team:
+- David Nicolay 26296918
+- Kellen Mossner 26024284
+- Matthew Holm 26067404
+
 ### 1. <u>**Introduction**</u>
-Our analysis uses a variety of natural language processing techniques we learned in class to analyze book reviews from the GoodBooks dataset. The main goals are to generate useful text like summaries, book descriptions, and star rating prediction, as well as to extract valuable information from user evaluations. Aspect-based sentiment analysis (ABSA), text generation, sentiment analysis, and summarization are some of the methods employed.
+Our analysis uses a variety of natural language processing techniques we learned in class to analyze book reviews from the our GoodReads dataset which we scraped. The main goals were to generate useful text like summaries, book descriptions, and star rating prediction, as well as to extract valuable information from user evaluations. Aspect-based sentiment analysis (ABSA), text generation, sentiment analysis, and summarization were some of the methods employed.
 
 ---
 ### 2. <u>**Ideas and Application**</u>
-Our aim is to automate the analysis and synthesis of book reviews to make it easier to derive insights from books. The main ideas include:
+Our aim is to automate the analysis and synthesis of book reviews to make it easier to derive insights from books. Therefore, improving . The main ideas include:
 - **Scraping**: Using R and Python to collect our data in an ethical and non-invasive way.
 - **Preprocessing**: Preparing our scraped data for analysis in R.
 - **EDA**: Exploring relationships and distributions of our predictors.
@@ -30,7 +35,9 @@ The implementation is divided into several stages - using R for EDA and basic se
 4. **Star Rating Prediction**:
    - A sequential neural network is implemented using TensorFlow Keras to predict star ratings based on the review text. The model is trained on a labeled dataset where the input features are the encoded review text and the target labels are the star ratings.
 5. **Aspect-Based Sentiment Analysis (ABSA)**:
-   - For ABSA, we used InstructABSA, a model that achieves high performance on benchmark datasets like SemEval 2014 Task 4. The model provides fine-grained sentiment analysis for different aspects of the book, such as plot, characters, and writing style, offering a detailed understanding of each review's content.
+   - For ABSA, we used InstructABSA, a model that achieves high performance on benchmark datasets like SemEval 2014 Task 4. It is built on Tk-Instruct which is based off the T5 Text-To-Text Transformer model. The model provides fine-grained sentiment analysis for different aspects of the book, such as plot, characters, and writing style, offering a detailed understanding of each review's content. For a more in-depth explaination, refer to the `Summarization.ipynb` notebook.
+![ABSA.png](Summarization/images/ABSA.png)
+
 ---
 ### 4. <u>**Results and Findings**</u>
 - **Sentiment Analysis**: Most reviews tend to be positive, reflecting a general tendency for people to write reviews for books they enjoyed. However, some genres had more polarized sentiments (such as horror).
@@ -40,17 +47,18 @@ The implementation is divided into several stages - using R for EDA and basic se
 - **Aspect-Based Sentiment Analysis**: ABSA provided a nuanced view of reviews by highlighting specific aspects praised or criticized by readers. For instance, certain books received high praise for plot development but were critiqued for character depth.
 ---
 ### 5. <u>**Ethical Considerations**</u>
-- No personal data was scrapped.
+- No personal data was scraped.
 - Data is used exclusively for demonstrating the NLP and Deep Learning methods we were taught in class.
-- In implementing our web scraper we made sure to use time.sleep() in order to not overload the servers for [goodreads.com](http://goodreads.com) with constant requests from out scraper.
+- In implementing our web scraper we made sure to use time.sleep() in order to not overload the servers for [goodreads.com](http://goodreads.com) with constant requests from our scraper.
 - We also made sure to not bypass and security measures that were in place to prevent web scrapers from accessing the website. We only scraped the data that is publicly available.
 ---
 ### 6. <u>**Conclusions**</u>
 Our attempt shows how well sophisticated NLP approaches work for automating the examination of book reviews. A thorough grasp of reader attitudes may be obtained by combining sentiment analysis, aspect-based sentiment analysis, summarization, and text production. The methods used not only help in summarizing large volumes of text but also in generating new content, such as book descriptions, that can be useful for readers, authors, and publishers. This entire process is applicable to many different review contexts (granted to data is easily available).
 
 ---
-
-
+### 7. <u>**Final Product On Website**</u>
+Note the "Readers Praise", "Readers Dislike" and "Reviews Summary" sections.
+![FinalProduct.png](FinalProduct.png)
 
 
 
