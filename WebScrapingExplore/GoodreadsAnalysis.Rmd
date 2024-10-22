@@ -37,13 +37,13 @@ showtext_auto()
 
 my_custom_theme <- theme_minimal() +
   theme(
-    plot.background = element_rect(fill = "#fff2d4", color = NA),
-    panel.background = element_rect(fill = "#fff2d4", color = NA),
+    plot.background = element_rect(fill = "#F3F1DE", color = NA),
+    panel.background = element_rect(fill = "#F3F1DE", color = NA),
     title = element_text(color = "#2D2D2D", size = 20, family = "Montserrat"),
     axis.text = element_text(color = "#2D2D2D", size = 12, family = "Montserrat"),
     axis.title = element_text(face = "bold", color = "#FF8500", size = 14, family = "Montserrat"),
-    legend.background = element_rect(fill = "#fff2d4", color = NA),
-    legend.key = element_rect(fill = "#fff2d4", color = NA),
+    legend.background = element_rect(fill = "#F3F1DE", color = NA),
+    legend.key = element_rect(fill = "#F3F1DE", color = NA),
     panel.grid.major = element_line(color = "#2D2D2D", linewidth = 0.2),  # black gridlines
     panel.grid.minor = element_line(color = "#2D2D2D", linewidth = 0.1),
     axis.title.x = element_text(margin = margin(t = 15)),  # Add spacing to the top of the x-axis title
@@ -75,8 +75,6 @@ unique_genres <- unique(genres_list)
 # Create a new data frame with the books genres
 reviews <- reviews %>%
   inner_join(book_genres, by = c("Book.Title" = "Book.Title"))  # Join reviews with book genres
-
-head(reviews)
 ```
 
 ## Data Preprocessing
@@ -99,6 +97,7 @@ reviews <- reviews %>%
 
 # Convert Review.Date to Date format
 reviews$Review.Date <- as.Date(reviews$Review.Date, format = "%B %d, %Y")
+reviews$First.Published.Date <- as.Date(reviews$First.Published.Date, format = "%B %d, %Y")
 
 # Remove all special characters and convert to lowercase
 reviews$Review.Text <- reviews$Review.Text %>%
@@ -106,7 +105,10 @@ reviews$Review.Text <- reviews$Review.Text %>%
     str_replace_all("\\s+", " ") %>%            # Replace multiple spaces/newlines/tabs with a single space
     str_trim() %>%        # Trim leading and trailing whitespace
     tolower()             # Convert to lowercase
-head(reviews)
+kable(head(reviews %>% 
+  mutate(Review.Text = str_trunc(Review.Text, 100, "right"))),
+  align = "l",  # left-align text
+  caption = "Sample of Reviews")
 ```
 
 ## Exploratory Data Analysis
@@ -130,7 +132,7 @@ avg_review_length <- reviews %>%
 
 # Plot the distribution of the average review length per star
 ggplot(avg_review_length, aes(x = Review.Stars, y = Average.Length)) +
-  geom_bar(stat = "identity", fill = darjeeling1[2], color="black") +
+  geom_bar(stat = "identity", fill = darjeeling1[2], color="black", alpha=0.8) +
   labs(x = "Review Stars", y = "Average Review Length (characters)", 
        title = "Average Review Lengths per Star") 
 ```
@@ -282,6 +284,19 @@ bing_word_counts %>%
 ```
 
 ## [NLP] Question: Which review words resulted in highest rating?
+First let's clean the dataset for our specific purpose. The words should also be tokenized and stopwords removed.
+```{r tokenize}
+replace_reg <- "(https?:.*?([\\s]|[a-zA-Z0-9]$))|(www:.*?([\\s]|[a-zA-Z0-9]$))"
+unnest_reg <- "[^A-Za-z_\\d#@']"
+# Select the relevant columns
+words_rating_reviews <- reviews %>% 
+  select(Review.Text, Review.Stars)
+  
+# Tokenize the review text
+words_ratings <- words_rating_reviews %>%
+  unnest_tokens(word, Review.Text, token = "regex", pattern = unnest_reg, drop = FALSE) %>%
+  anti_join(stop_words) # Remove stop words
+```
 
 ```{r calc_avg_rating}
 # Calculate average ratings for each word
@@ -382,6 +397,15 @@ ggplot(avg_stars_per_year, aes(x = year, y = avg_stars)) +
 The books with the lowest
 
 ## [Topic Analysis] Question: What are the most common topics or themes discussed in positive vs. negative reviews?
+
+```{r}
+unordered_books_sentiment <- sentiment_scores %>%
+  group_by(Book.Title) %>%
+  summarize(avg_sentiment = mean(sentiment_score),
+            avg_stars = mean(Review.Stars),
+            review_count = n())
+print(unordered_books_sentiment)
+```
 
 ```{r}
 # Join the sentiment scores with the reviews
