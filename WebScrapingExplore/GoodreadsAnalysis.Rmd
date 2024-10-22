@@ -171,7 +171,7 @@ ggplot(top_worst_reviews, aes(x = Review.Stars, fill = Book.Title)) +
   geom_histogram(alpha = 0.8, color = "black", binwidth = 1) +  # Create bar plots for the distribution of stars
   facet_wrap(~ Book.Title, ncol = 2) +  # Create two separate plots side by side
   scale_fill_manual(values = darjeeling1[c(1, 2)]) +
-  labs(title = "Distribution of Review Stars for Top and Worst Books",
+  labs(
        x = "Review Stars",
        y = "Number of Reviews") +
   theme(legend.position = "none",   # Remove the legend
@@ -180,6 +180,22 @@ ggplot(top_worst_reviews, aes(x = Review.Stars, fill = Book.Title)) +
 ```
 
 Although the reviews for The Holy Bible: King James Version are mostly 1-star reviews, the average rating for the book on goodreads.com is 4.44. We filtered reviews for each book by most popular reviews so it is unclear why most of the popular reviews are 1-star reviews.
+
+```{r avg stars per year}
+# Calculate average stars per year
+avg_stars_per_year <- reviews %>%
+  mutate(year = year(Review.Date)) %>%         # Extract the year from Review.Date
+  group_by(year) %>%                           # Group by year
+  summarize(avg_stars = mean(Review.Stars, na.rm = TRUE))  # Calculate average stars per year
+
+# Plot both bar plot and line plot for average stars per year
+ggplot(avg_stars_per_year, aes(x = year, y = avg_stars)) +
+  geom_col(fill = darjeeling1[1], alpha = 0.7) +  # Bar plot with fill color and some transparency
+  labs(title = "Average Stars per Year",
+       x = "Year",
+       y = "Average Stars") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
 
 ## Sentiment Analysis
 
@@ -256,11 +272,11 @@ num_sentiments <- length(unique(sentiment_counts$sentiment))
 
 ggplot(sentiment_counts, aes(x = sentiment, y = n, fill = sentiment)) +
   geom_bar(stat = "identity", width = 0.9) +
-  labs(title = "Sentiment Count in Book Reviews", x = "Sentiment", y = "Count") +
+  labs( x = "Sentiment", y = "Count") +
   scale_fill_manual(values = extended_palette(num_sentiments)) +  # Extend the palette to match sentiments
   theme(legend.position = "none",
         axis.text.x = element_text(angle = 45, hjust = 1)) + # Customize axis titles
-  scale_y_continuous(labels = scales::comma) 
+  scale_y_continuous(labels = scales::comma)
 ```
 ### Sentiment Analysis using Bing Lexicon
 ```{r bing sentiments}
@@ -282,57 +298,7 @@ bing_word_counts %>%
                                "negative" = darjeeling1[1])) +  # Set a color for negative sentiment
   theme(strip.text = element_text(size = 14))
 ```
-
-## [NLP] Question: Which review words resulted in highest rating?
-First let's clean the dataset for our specific purpose. The words should also be tokenized and stopwords removed.
-```{r tokenize}
-replace_reg <- "(https?:.*?([\\s]|[a-zA-Z0-9]$))|(www:.*?([\\s]|[a-zA-Z0-9]$))"
-unnest_reg <- "[^A-Za-z_\\d#@']"
-# Select the relevant columns
-words_rating_reviews <- reviews %>% 
-  select(Review.Text, Review.Stars)
-  
-# Tokenize the review text
-words_ratings <- words_rating_reviews %>%
-  unnest_tokens(word, Review.Text, token = "regex", pattern = unnest_reg, drop = FALSE) %>%
-  anti_join(stop_words) # Remove stop words
-```
-
-```{r calc_avg_rating}
-# Calculate average ratings for each word
-word_avg_ratings <- words_ratings %>%
-  group_by(word) %>%
-  summarise(
-    avg_rating = mean(Review.Stars),
-    count = n()
-  ) %>%
-  filter(count >= 10)  # Filter words that appear at least 10 times
-```
-
-```{r}
-# Find the words with the highest ratings
-top_words <- word_avg_ratings %>%
-  arrange(desc(avg_rating)) %>%
-  head(20)
-
-# Display the results
-print(top_words)
-```
-
-```{r}
-# Find the words with the lowest ratings
-top_words <- word_avg_ratings %>%
-  arrange(avg_rating) %>%
-  head(20)
-
-# Display the results
-print(top_words)
-```
-
-As somewhat is to be expected, the common words that result in high reviews don't generalize well across books. No trend can easily be identified from this top average rating list.
-
-## [Sentiment Analysis] Question: How does the sentiment of reviews correlate with the star rating given?
-
+### Question: How does the sentiment of reviews correlate with the star rating given?
 
 ```{r}
 # Calculate sentiment score for each review
@@ -378,25 +344,55 @@ ggplot(avg_sentiment_per_year, aes(x = year, y = avg_sentiment_score)) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-```{r avg stars per year}
-# Calculate average stars per year
-avg_stars_per_year <- reviews %>%
-  mutate(year = year(Review.Date)) %>%         # Extract the year from Review.Date
-  group_by(year) %>%                           # Group by year
-  summarize(avg_stars = mean(Review.Stars, na.rm = TRUE))  # Calculate average stars per year
-
-# Plot both bar plot and line plot for average stars per year
-ggplot(avg_stars_per_year, aes(x = year, y = avg_stars)) +
-  geom_col(fill = darjeeling1[1], alpha = 0.7) +  # Bar plot with fill color and some transparency
-  labs(title = "Average Stars per Year",
-       x = "Year",
-       y = "Average Stars") +
-  theme(plot.title = element_text(hjust = 0.5))
+## NLP Question: Which review words resulted in highest rating?
+First let's clean the dataset for our specific purpose. The words should also be tokenized and stopwords removed.
+```{r tokenize}
+replace_reg <- "(https?:.*?([\\s]|[a-zA-Z0-9]$))|(www:.*?([\\s]|[a-zA-Z0-9]$))"
+unnest_reg <- "[^A-Za-z_\\d#@']"
+# Select the relevant columns
+words_rating_reviews <- reviews %>% 
+  select(Review.Text, Review.Stars)
+  
+# Tokenize the review text
+words_ratings <- words_rating_reviews %>%
+  unnest_tokens(word, Review.Text, token = "regex", pattern = unnest_reg, drop = FALSE) %>%
+  anti_join(stop_words) # Remove stop words
 ```
 
-The books with the lowest
+```{r calc_avg_rating}
+# Calculate average ratings for each word
+word_avg_ratings <- words_ratings %>%
+  group_by(word) %>%
+  summarise(
+    avg_rating = mean(Review.Stars),
+    count = n()
+  ) %>%
+  filter(count >= 10)  # Filter words that appear at least 10 times
+```
 
-## [Topic Analysis] Question: What are the most common topics or themes discussed in positive vs. negative reviews?
+```{r}
+# Find the words with the highest ratings
+top_words <- word_avg_ratings %>%
+  arrange(desc(avg_rating)) %>%
+  head(20)
+
+# Display the results
+print(top_words)
+```
+
+```{r}
+# Find the words with the lowest ratings
+bottom_words <- word_avg_ratings %>%
+  arrange(avg_rating) %>%
+  head(20)
+
+# Display the results
+print(bottom_words)
+```
+
+As somewhat is to be expected, the common words that result in high reviews don't generalize well across books. No trend can easily be identified from this top average rating list.
+
+## Topic Analysis Question: What are the most common topics or themes discussed in positive vs. negative reviews?
 
 ```{r}
 unordered_books_sentiment <- sentiment_scores %>%
@@ -534,7 +530,7 @@ For these books to have 1 or 2 star reviews with such high sentiment scores defi
 
 average_ratings <- reviews %>%
   group_by(Book.Title) %>%
-  summarize(avg_rating = mean(Review.Stars))  # Use na.rm to handle any NA values
+  summarize(avg_rating = mean(Review.Stars))
 
 print(average_ratings)
 
@@ -544,12 +540,12 @@ sarcastic_reviews <- sentiment_scores %>%
 
 # Create a sarcasm indicator in the sarcastic_reviews dataframe
 sarcastic_reviews <- sarcastic_reviews %>%
-  mutate(sarcasm = 1)  # Mark sarcastic reviews
+  mutate(sarcasm = 1)
 
 # Create a non-sarcastic data frame for comparison
 non_sarcastic_reviews <- sentiment_scores %>%
-  filter(!(sentiment_score > 0 & Review.Stars <= 2)) %>%  # Exclude sarcastic reviews
-  mutate(sarcasm = 0)  # Mark non-sarcastic reviews
+  filter(!(sentiment_score > 0 & Review.Stars <= 2)) %>%
+  mutate(sarcasm = 0)
 
 # Combine both data frames
 combined_reviews <- bind_rows(sarcastic_reviews, non_sarcastic_reviews)
@@ -557,10 +553,13 @@ combined_reviews <- bind_rows(sarcastic_reviews, non_sarcastic_reviews)
 # Merge with average ratings to include average book rating
 final_analysis <- combined_reviews %>%
   group_by(Book.Title) %>%
-  summarize(avg_rating = mean(Review.Stars, na.rm = TRUE), 
-            sentiment_score = mean(sentiment_score, na.rm = TRUE),
-            sarcasm = first(sarcasm))  # Use first(sarcasm) to get sarcasm indicator
+  summarize(sentiment_score = mean(sentiment_score, na.rm = TRUE),
+            sarcasm = first(sarcasm)) %>%
+  mutate(avg_rating = average_ratings$avg_rating)
+  
 # Calculate correlation between sentiment score and average rating
+print(final_analysis)
+
 correlation_result <- cor(final_analysis$sentiment_score, final_analysis$avg_rating)
 print(paste("Correlation between sentiment score and average book rating:", correlation_result))
 
@@ -568,19 +567,14 @@ print(paste("Correlation between sentiment score and average book rating:", corr
 model <- lm(avg_rating ~ sentiment_score + sarcasm, data = final_analysis)
 summary(model)
 
-# Create a scatter plot
 ggplot(final_analysis, aes(x = sentiment_score, y = avg_rating, color = factor(sarcasm))) +
-  geom_point(alpha = 0.6) +
+  geom_point(alpha = 0.8) +
   geom_smooth(method = "lm", se = FALSE) +
-  labs(title = "Sentiment Score vs. Average Book Rating",
+  labs(title = "Sentiment Score vs. Book Rating",
        x = "Sentiment Score",
        y = "Average Book Rating",
-       color = "Sarcasm Indicator") +
-  theme_minimal()
-
-
+       color = "Sarcasm Indicator")
 ```
-
 Based on what we see above, we note that: - Reviews marked as sarcastic tend to lower the average ratings despite having potentially positive sentiment - The p-value for the sarcasm coefficient is very low (4.32e-09), indicating that the effect of sarcasm on average book ratings is statistically significant. It's also important to note the very low R-squared value though, indicating other factors play a more substantial role in influencing book ratings. -Reviews that contain sarcastic remarks may mislead potential readers into thinking a book is being praised, when in reality, it is being criticized. This disconnect can lead to lower ratings as readers might find that the book does not meet their expectations.
 
 In conclusion, it is fair to say that there MIGHT be some evidence of sarcastic reviews having an impact on the overall rating, but it is more likely that other variables a more important in predicting overall review scores.
