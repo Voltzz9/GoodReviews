@@ -1,3 +1,11 @@
+# Data Science 346 Project Stellenbosch University
+# Date: 2024-10-22
+# TEAM
+# - David Nicolay 26296918
+# - Kellen Mossner 26024284
+# - Matthew Holm 26067404
+
+
 from selenium import webdriver 
 from selenium.webdriver.chrome.service import Service as ChromeService 
 from webdriver_manager.chrome import ChromeDriverManager 
