@@ -1,7 +1,8 @@
 ﻿
-## <u>GoodBooks Reviews Analysis</u>
+## <u>GoodReads Review Analysis</u>
+
 ### 1. <u>**Introduction**</u>
-Our analysis uses a variety of natural language processing techniques we learned in class to analyze book reviews from the our GoodBooks dataset which we scraped. The main goals were to generate useful text like summaries, book descriptions, and star rating prediction, as well as to extract valuable information from user evaluations. Aspect-based sentiment analysis (ABSA), text generation, sentiment analysis, and summarization were some of the methods employed.
+Our analysis uses a variety of natural language processing techniques we learned in class to analyze book reviews from the our GoodReads dataset which we scraped. The main goals were to generate useful text like summaries, book descriptions, and star rating prediction, as well as to extract valuable information from user evaluations. Aspect-based sentiment analysis (ABSA), text generation, sentiment analysis, and summarization were some of the methods employed.
 
 ---
 ### 2. <u>**Ideas and Application**</u>
@@ -30,7 +31,9 @@ The implementation is divided into several stages - using R for EDA and basic se
 4. **Star Rating Prediction**:
    - A sequential neural network is implemented using TensorFlow Keras to predict star ratings based on the review text. The model is trained on a labeled dataset where the input features are the encoded review text and the target labels are the star ratings.
 5. **Aspect-Based Sentiment Analysis (ABSA)**:
-   - For ABSA, we used InstructABSA, a model that achieves high performance on benchmark datasets like SemEval 2014 Task 4. The model provides fine-grained sentiment analysis for different aspects of the book, such as plot, characters, and writing style, offering a detailed understanding of each review's content.
+   - For ABSA, we used InstructABSA, a model that achieves high performance on benchmark datasets like SemEval 2014 Task 4. It is built on Tk-Instruct which is based off the T5 Text-To-Text Transformer model. The model provides fine-grained sentiment analysis for different aspects of the book, such as plot, characters, and writing style, offering a detailed understanding of each review's content. For a more in-depth explaination, refer to the `Summarization.ipynb` notebook.
+![ABSA.png](Summarization/images/ABSA.png)
+
 ---
 ### 4. <u>**Results and Findings**</u>
 - **Sentiment Analysis**: Most reviews tend to be positive, reflecting a general tendency for people to write reviews for books they enjoyed. However, some genres had more polarized sentiments (such as horror).

@@ -4,6 +4,10 @@ author: "David Nicolay, Kellen Mossner, Matthew Holm"
 date: "2024-10-01"
 output: html_document
 ---
+TEAM
+- David Nicolay 26296918
+- Kellen Mossner 26024284
+- Matthew Holm 26067404
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
