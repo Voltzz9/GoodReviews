@@ -39,6 +39,13 @@ The implementation is divided into several stages - using R for EDA and basic se
 ![ABSA.png](Summarization/images/ABSA.png)
 
 ---
+
+### 4. <u>**Technical Summary of Pretrained Models**</u>
+
+
+
+
+---
 ### 4. <u>**Results and Findings**</u>
 - **Sentiment Analysis**: Most reviews tend to be positive, reflecting a general tendency for people to write reviews for books they enjoyed. However, some genres had more polarized sentiments (such as horror).
 - **Summarization**: The generated summaries effectively captured the main points of each review, helping to distill lengthy reviews into concise reviews.
