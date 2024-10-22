@@ -1,5 +1,9 @@
 ﻿
 ## <u>GoodReads Review Analysis</u>
+Team:
+- David Nicolay 26296918
+- Kellen Mossner 26024284
+- Matthew Holm 26067404
 
 ### 1. <u>**Introduction**</u>
 Our analysis uses a variety of natural language processing techniques we learned in class to analyze book reviews from the our GoodReads dataset which we scraped. The main goals were to generate useful text like summaries, book descriptions, and star rating prediction, as well as to extract valuable information from user evaluations. Aspect-based sentiment analysis (ABSA), text generation, sentiment analysis, and summarization were some of the methods employed.
