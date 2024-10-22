@@ -35,12 +35,19 @@ The implementation is divided into several stages - using R for EDA and basic se
 4. **Star Rating Prediction**:
    - A sequential neural network is implemented using TensorFlow Keras to predict star ratings based on the review text. The model is trained on a labeled dataset where the input features are the encoded review text and the target labels are the star ratings.
 5. **Aspect-Based Sentiment Analysis (ABSA)**:
-   - For ABSA, we used InstructABSA, a model that achieves high performance on benchmark datasets like SemEval 2014 Task 4. It is built on Tk-Instruct which is based off the T5 Text-To-Text Transformer model. The model provides fine-grained sentiment analysis for different aspects of the book, such as plot, characters, and writing style, offering a detailed understanding of each review's content. For a more in-depth explaination, refer to the `Summarization.ipynb` notebook.
-![ABSA.png](Summarization/images/ABSA.png)
+   - For ABSA, we used InstructABSA, a model that achieves high performance on benchmark datasets like SemEval 2014 Task 4. It is built on Tk-Instruct which is based off the T5 Text-To-Text Transformer model. The model provides fine-grained sentiment analysis for different aspects of the book, such as plot, characters, and writing style, offering a detailed understanding of each review's content.
 
 ---
+### 4. <u>**Technical Summary of Sentence-BERT**</u>
 
-### 4. <u>**Technical Summary of Pretrained Models**</u>
+SBERT modifies BERT's architecture in the following ways:
+- Employs siamese network structure with twin BERT models sharing identical weights
+- Removes BERT's classification head
+- Processes sentence pairs in parallel through the twin networks
+Implements mean pooling on the output embeddings:
+
+---
+### 5. <u>**Technical Summary of ABSA Pretrained model**</u>
 
 The ABSA field is an extremely active area of research. A popular dataset which is often used as a benchmark for ABSA models is the [SemEval 2014 Task 4](https://paperswithcode.com/sota/aspect-based-sentiment-analysis-on-semeval). We considered many alternative papers and datasets, and finally settled on [InstructABSA](https://arxiv.org/abs/2302.08624v6) due to its incredible performance on benchmarks and ease of use.
 
@@ -167,24 +174,24 @@ The decoder also consists of multiple layers (12 layers in T5-Base). Each layer 
 
 
 ---
-### 4. <u>**Results and Findings**</u>
+### 6. <u>**Results and Findings**</u>
 - **Sentiment Analysis**: Most reviews tend to be positive, reflecting a general tendency for people to write reviews for books they enjoyed. However, some genres had more polarized sentiments (such as horror).
 - **Summarization**: The generated summaries effectively captured the main points of each review, helping to distill lengthy reviews into concise reviews.
 - **Book Descriptions**: Text generation for book descriptions was successful in producing engaging content, although fine-tuning the prompt was necessary to ensure descriptions sounded more objective. One of the biggest issues was 3rd person generation, which wasn't obtained consistently.
 - **Star Prediction**: The sequential model demonstrated inconsistent results - the accuracy was low and the models showed signs of overfitting. Regularisation methods did not yield much better results. There were some promising results when inputting shorter reviews.
 - **Aspect-Based Sentiment Analysis**: ABSA provided a nuanced view of reviews by highlighting specific aspects praised or criticized by readers. For instance, certain books received high praise for plot development but were critiqued for character depth.
 ---
-### 5. <u>**Ethical Considerations**</u>
+### 7. <u>**Ethical Considerations**</u>
 - No personal data was scraped.
 - Data is used exclusively for demonstrating the NLP and Deep Learning methods we were taught in class.
 - In implementing our web scraper we made sure to use time.sleep() in order to not overload the servers for [goodreads.com](http://goodreads.com) with constant requests from our scraper.
 - We also made sure to not bypass and security measures that were in place to prevent web scrapers from accessing the website. We only scraped the data that is publicly available.
 ---
-### 6. <u>**Conclusions**</u>
+### 8. <u>**Conclusions**</u>
 Our attempt shows how well sophisticated NLP approaches work for automating the examination of book reviews. A thorough grasp of reader attitudes may be obtained by combining sentiment analysis, aspect-based sentiment analysis, summarization, and text production. The methods used not only help in summarizing large volumes of text but also in generating new content, such as book descriptions, that can be useful for readers, authors, and publishers. This entire process is applicable to many different review contexts (granted to data is easily available).
 
 ---
-### 7. <u>**Final Product On Website**</u>
+### 9. <u>**Final Product On Website**</u>
 Note the "Readers Praise", "Readers Dislike" and "Reviews Summary" sections.
 ![FinalProduct.png](FinalProduct.png)
 
